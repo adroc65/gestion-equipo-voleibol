@@ -138,6 +138,7 @@ dialog::backdrop{background:#0009;}
     <button class="btnSec" style="padding:11px" id="btnImportTxt">⬆ Importar TXT (stats)</button>
     <button class="btnSec" style="padding:11px" id="btnExportEquipo">⬇ Exportar JSON</button>
   </div>
+  <button class="btnSec no-print" style="width:100%;padding:11px;margin-top:6px;background:var(--naranja)" id="btnExportStats">⬇ Exportar TXT para Estadísticas</button>
   <input type="file" id="importFile" accept=".txt,.json" style="display:none">
   <button class="btnBig" id="btnGuardarEquipo">💾 Guardar equipo</button>
   <button class="btnBack" id="btnBackEditor">← Volver</button>
@@ -358,6 +359,15 @@ function importarTxt(file){
   }catch(e){ toast("Error al leer el archivo"); } };
   reader.readAsText(file);
 }
+function exportarParaStats(){
+  const nombre=$("#edNombre").value.trim()||equipoActual||"equipo";
+  const jugs=jugadorasActuales.length?jugadorasActuales:(equipoActual?cargar()[equipoActual]?.jugadoras||[]:[]);
+  const data={nombre, jugadoras:jugs.map(j=>({num:j.num, nom:j.nom, rol:j.rol||"?"}))};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"text/plain"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`equipo_${nombre.replace(/\W+/g,"_")}.txt`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
 function exportarEquipoJSON(){
   const eq=cargar(); const nombre=$("#edNombre").value.trim()||equipoActual||"equipo";
   const data=equipoActual&&eq[equipoActual]?eq[equipoActual]:{nombre,jugadoras:[],sesiones:[]};
@@ -546,6 +556,7 @@ $("#btnAddJug").onclick=()=>{ if(!equipoActual||!$("#edNombre").value.trim()){ t
 $("#btnImportTxt").onclick=()=>$("#importFile").click();
 $("#importFile").onchange=e=>{ if(e.target.files[0]) importarTxt(e.target.files[0]); e.target.value=""; };
 $("#btnExportEquipo").onclick=exportarEquipoJSON;
+$("#btnExportStats").onclick=exportarParaStats;
 
 $("#btnGuardarFicha").onclick=guardarFicha;
 $("#btnBackFicha").onclick=()=>mostrar("editor");
