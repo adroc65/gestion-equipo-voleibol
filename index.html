@@ -28,7 +28,7 @@ p.sub{color:var(--muted);text-align:center;margin:0 0 14px;font-size:13px;}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px;}
 .card h2{font-size:15px;margin-bottom:10px;color:var(--azulc);}
 label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px;}
-input,select,textarea{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0c1a2c;color:var(--txt);font-size:15px;font-family:inherit;}
+input,select,textarea{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0c1a2c;color:var(--txt);font-size:16px;font-family:inherit;}
 textarea{resize:vertical;min-height:60px;}
 .fila{display:flex;gap:8px;}
 .fila>*{flex:1;}
@@ -135,10 +135,10 @@ dialog::backdrop{background:#0009;}
     <button class="btnSec" style="width:100%;padding:11px;margin-top:10px" id="btnAddJug">+ Añadir jugadora</button>
   </div>
   <div class="fila no-print">
-    <button class="btnSec" style="padding:11px" id="btnImportTxt">⬆ Importar TXT (stats)</button>
-    <button class="btnSec" style="padding:11px" id="btnExportEquipo">⬇ Exportar JSON</button>
+    <button class="btnSec" style="padding:11px" id="btnImportTxt">⬆ Cargar plantilla (stats)</button>
+    <button class="btnSec" style="padding:11px" id="btnExportEquipo">⬇ Salvar JSON completo</button>
   </div>
-  <button class="btnSec no-print" style="width:100%;padding:11px;margin-top:6px;background:var(--naranja)" id="btnExportStats">⬇ Exportar TXT para Estadísticas</button>
+  <button class="btnSec no-print" style="width:100%;padding:11px;margin-top:6px;background:var(--naranja)" id="btnExportStats">⬇ Salvar para app Estadísticas</button>
   <input type="file" id="importFile" accept=".txt,.json" style="display:none">
   <button class="btnBig" id="btnGuardarEquipo">💾 Guardar equipo</button>
   <button class="btnBack" id="btnBackEditor">← Volver</button>
