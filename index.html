@@ -70,6 +70,14 @@ textarea{resize:vertical;min-height:60px;}
 .histJugRow .hFecha{flex:1;color:var(--muted);}
 .presente{color:#69f0ae;font-weight:700;}
 .ausente{color:#ff8a80;font-weight:700;}
+.asist-alta{color:#69f0ae;font-weight:800;}
+.asist-media{color:var(--amar);font-weight:800;}
+.asist-baja{color:#ff8a80;font-weight:800;}
+.asistResumen{font-size:13px;padding:8px 0 4px;border-bottom:1px solid var(--line);margin-bottom:6px;}
+.estRow{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line);}
+.estRow:last-child{border-bottom:none;}
+.estRow .eLabel{color:var(--muted);}
+.estRow .eVal{font-weight:700;}
 
 /* ── Nueva sesión / ver sesión ── */
 .sesRow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
@@ -117,6 +125,7 @@ dialog::backdrop{background:#0009;}
 <!-- 1) SELECTOR DE EQUIPOS -->
 <div id="sel" class="pantalla">
   <h1>🏐 Gestión Equipo Voleibol</h1>
+  <p style="text-align:center;font-size:11px;color:var(--muted);margin:-10px 0 8px;font-family:monospace">commit: 2138002</p>
   <p class="sub">Selecciona un equipo</p>
   <div class="card"><h2>Mis equipos</h2><div id="listaEquipos"></div></div>
   <button class="btnBig btnSec" id="btnNuevoEquipo">➕ Nuevo equipo</button>
@@ -209,6 +218,17 @@ dialog::backdrop{background:#0009;}
 <div id="historial" class="pantalla oculto">
   <h1 id="histTitulo">Historial</h1>
   <p class="sub" id="histSub"></p>
+  <div class="card" id="cardEstEquipo" style="display:none">
+    <h2>📊 Estadísticas del equipo</h2>
+    <div id="estEquipoCont"></div>
+  </div>
+  <div class="card no-print">
+    <div class="fila">
+      <div><label>Desde</label><input type="date" id="filtroDesde"></div>
+      <div><label>Hasta</label><input type="date" id="filtroHasta"></div>
+    </div>
+    <button class="btnSec" style="width:100%;padding:9px;margin-top:6px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)" id="btnLimpiarFiltro">✕ Quitar filtro</button>
+  </div>
   <div class="card">
     <div id="histLista"></div>
   </div>
@@ -223,7 +243,9 @@ dialog::backdrop{background:#0009;}
   <div class="card">
     <div id="verSesionLista"></div>
   </div>
-  <button class="btnSec" style="width:100%;padding:13px;background:var(--naranja)" onclick="window.print()">🖨 Imprimir / PDF</button>
+  <button class="btnSec no-print" style="width:100%;padding:13px;background:var(--azulc)" id="btnEditarSesion">✏ Editar asistencia</button>
+  <button class="btnBig oculto" id="btnGuardarEdicion">💾 Guardar cambios</button>
+  <button class="btnSec" style="width:100%;padding:13px;margin-top:6px;background:var(--naranja)" onclick="window.print()">🖨 Imprimir / PDF</button>
   <button class="btnBack" id="btnBackVerSesion">← Volver al historial</button>
 </div>
 
@@ -241,7 +263,7 @@ const LS_KEY="gestion_equipos_v1";
 const ROLES={COL:"Colocadora",PUN:"Punta",LIB:"Líbero",OPU:"Opuesta",DEF:"Defensa",CEN:"Central","?":"Sin definir"};
 const AVATAR=`data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231b3354'/%3E%3Ccircle cx='50' cy='36' r='22' fill='%234a6a8a'/%3E%3Cellipse cx='50' cy='95' rx='34' ry='26' fill='%234a6a8a'/%3E%3C/svg%3E`;
 
-let equipoActual=null, jugadoraActual=null, sesionEquipo=null, jugadorasActuales=[];
+let equipoActual=null, jugadoraActual=null, sesionEquipo=null, jugadorasActuales=[], verSesionId=null;
 
 /* ── Storage ── */
 const cargar=()=>{ try{return JSON.parse(localStorage.getItem(LS_KEY))||{};}catch(e){return{};} };
@@ -401,7 +423,11 @@ function abrirFicha(num){
   const histCont=$("#fichaHist");
   if(e&&j&&e.sesiones.length){
     const sesOrd=[...e.sesiones].sort((a,b)=>b.id-a.id);
-    histCont.innerHTML="";
+    const totalSes=e.sesiones.length;
+    const presSes=e.sesiones.filter(s=>s.presentes.includes(String(j.num))).length;
+    const pct=Math.round(presSes/totalSes*100);
+    const cls=pct>=80?"asist-alta":pct>=50?"asist-media":"asist-baja";
+    histCont.innerHTML=`<div class="asistResumen"><span class="${cls}">${pct}%</span> asistencia &nbsp;·&nbsp; ${presSes} de ${totalSes} entrenamientos</div>`;
     sesOrd.forEach(ses=>{
       const pres=ses.presentes.includes(String(j.num));
       const row=document.createElement("div"); row.className="histJugRow";
@@ -487,10 +513,43 @@ function abrirHistorial(nom){
   sesionEquipo=nom;
   const eq=cargar(), e=eq[nom];
   $("#histTitulo").textContent=nom;
-  $("#histSub").textContent=`${e?e.sesiones.length:0} sesiones registradas`;
+  // Limpiar filtro al abrir
+  $("#filtroDesde").value=""; $("#filtroHasta").value="";
+  if(!e||!e.sesiones.length){
+    $("#histSub").textContent="0 sesiones registradas";
+    $("#histLista").innerHTML='<p class="sub" style="margin:0">Sin sesiones aún</p>';
+    $("#cardEstEquipo").style.display="none";
+    mostrar("historial"); return;
+  }
+  $("#histSub").textContent=`${e.sesiones.length} sesiones registradas`;
+  // Estadísticas del equipo
+  const card=$("#cardEstEquipo"), cont=$("#estEquipoCont");
+  const totalSes=e.sesiones.length;
+  const totalJug=e.jugadoras.length;
+  const sumPres=e.sesiones.reduce((s,ses)=>s+ses.presentes.length,0);
+  const promedio=totalSes?(sumPres/totalSes).toFixed(1):0;
+  const pct=totalJug?(Math.round(sumPres/totalSes/totalJug*100)):0;
+  // Jugadora más constante y más ausente
+  const cuentas={};
+  e.jugadoras.forEach(j=>{ cuentas[String(j.num)]={nom:j.nom,cnt:0}; });
+  e.sesiones.forEach(ses=>ses.presentes.forEach(n=>{ if(cuentas[n]) cuentas[n].cnt++; }));
+  const sorted=Object.entries(cuentas).sort((a,b)=>b[1].cnt-a[1].cnt);
+  const mas=sorted[0], menos=sorted[sorted.length-1];
+  cont.innerHTML=[
+    {l:"Total sesiones",v:totalSes},
+    {l:"Promedio presentes",v:`${promedio} / ${totalJug} (${pct}%)`},
+    mas?{l:"Más constante",v:`Nº${mas[0]} ${mas[1].nom} (${mas[1].cnt}/${totalSes})`}:null,
+    menos&&menos[0]!==mas[0]?{l:"Más ausente",v:`Nº${menos[0]} ${menos[1].nom} (${menos[1].cnt}/${totalSes})`}:null
+  ].filter(Boolean).map(r=>`<div class="estRow"><span class="eLabel">${r.l}</span><span class="eVal">${r.v}</span></div>`).join("");
+  card.style.display="";
+  renderSesionesHistorial(nom, e.sesiones);
+  mostrar("historial");
+}
+function renderSesionesHistorial(nom, sesiones){
+  const eq=cargar(), e=eq[nom]; if(!e) return;
   const cont=$("#histLista"); cont.innerHTML="";
-  if(!e||!e.sesiones.length){ cont.innerHTML='<p class="sub" style="margin:0">Sin sesiones aún</p>'; mostrar("historial"); return; }
-  const ord=[...e.sesiones].sort((a,b)=>b.id-a.id);
+  if(!sesiones.length){ cont.innerHTML='<p class="sub" style="margin:0">Sin sesiones en ese rango</p>'; return; }
+  const ord=[...sesiones].sort((a,b)=>b.id-a.id);
   ord.forEach(ses=>{
     const total=e.jugadoras.length, pres=ses.presentes.length;
     const row=document.createElement("div"); row.className="histSesRow";
@@ -508,35 +567,66 @@ function abrirHistorial(nom){
     };
     row.appendChild(bDel); cont.appendChild(row);
   });
-  mostrar("historial");
 }
 
 /* ══════════════════════════════════════════
    6) VER SESIÓN
 ══════════════════════════════════════════ */
 function abrirVerSesion(nom,sesId){
-  sesionEquipo=nom;
+  sesionEquipo=nom; verSesionId=sesId;
   const eq=cargar(), e=eq[nom]; if(!e) return;
   const ses=e.sesiones.find(s=>s.id===sesId); if(!ses) return;
   const titulo=`${nom} · ${formatFecha(ses.fecha)} ${ses.hora||""}`;
   $("#verSesionTit").textContent=formatFecha(ses.fecha)+" "+ses.hora;
   $("#verSesionSub").textContent=titulo+(ses.nota?" · "+ses.nota:"");
+  renderVerSesion(e, ses, false);
+  $("#btnEditarSesion").classList.remove("oculto");
+  $("#btnGuardarEdicion").classList.add("oculto");
+  mostrar("verSesion");
+}
+function renderVerSesion(e, ses, modoEdicion){
   const cont=$("#verSesionLista"); cont.innerHTML="";
   const presSet=new Set(ses.presentes.map(String));
   const jugs=[...e.jugadoras].sort((a,b)=>(+a.num)-(+b.num));
   jugs.forEach(j=>{
     const pres=presSet.has(String(j.num));
     const row=document.createElement("div"); row.className="sesRow";
-    row.innerHTML=`<img class="sAvatar" src="${j.foto||AVATAR}" alt="">
-      <div class="sInfo"><div class="sNom">Nº ${j.num} · ${j.nom||""}</div><div class="sSub">${ROLES[j.rol]||j.rol||""}</div></div>
-      <span class="${pres?"verPres":"verAus"}">${pres?"✓":"✗"}</span>`;
+    if(modoEdicion){
+      const chkId="vedit_"+j.num;
+      row.innerHTML=`<img class="sAvatar" src="${j.foto||AVATAR}" alt="">
+        <div class="sInfo"><div class="sNom">Nº ${j.num} · ${j.nom||""}</div><div class="sSub">${ROLES[j.rol]||j.rol||""}</div></div>
+        <div class="chkWrap"><input type="checkbox" id="${chkId}" ${pres?"checked":""}></div>`;
+    } else {
+      row.innerHTML=`<img class="sAvatar" src="${j.foto||AVATAR}" alt="">
+        <div class="sInfo"><div class="sNom">Nº ${j.num} · ${j.nom||""}</div><div class="sSub">${ROLES[j.rol]||j.rol||""}</div></div>
+        <span class="${pres?"verPres":"verAus"}">${pres?"✓":"✗"}</span>`;
+    }
     cont.appendChild(row);
   });
   const pres=ses.presentes.length, tot=e.jugadoras.length;
   const res=document.createElement("div"); res.style.cssText="text-align:center;padding:10px 0;font-size:13px;color:var(--muted);border-top:1px solid var(--line);margin-top:6px";
   res.textContent=`${pres} presentes · ${tot-pres} ausentes de ${tot}`;
   cont.appendChild(res);
-  mostrar("verSesion");
+}
+function toggleEditarSesion(){
+  const eq=cargar(), e=eq[sesionEquipo]; if(!e) return;
+  const ses=e.sesiones.find(s=>s.id===verSesionId); if(!ses) return;
+  renderVerSesion(e, ses, true);
+  $("#btnEditarSesion").classList.add("oculto");
+  $("#btnGuardarEdicion").classList.remove("oculto");
+}
+function guardarEdicionSesion(){
+  const eq=cargar(), e=eq[sesionEquipo]; if(!e) return;
+  const sesIdx=e.sesiones.findIndex(s=>s.id===verSesionId); if(sesIdx<0) return;
+  const nuevosPresentes=[...document.querySelectorAll('#verSesionLista input[type=checkbox]')]
+    .filter(c=>c.checked).map(c=>c.id.replace("vedit_",""));
+  e.sesiones[sesIdx].presentes=nuevosPresentes;
+  guardar(eq);
+  toast(`Sesión actualizada · ${nuevosPresentes.length} presentes`);
+  const ses=e.sesiones[sesIdx];
+  renderVerSesion(e, ses, false);
+  $("#btnEditarSesion").classList.remove("oculto");
+  $("#btnGuardarEdicion").classList.add("oculto");
 }
 
 /* ── Utilidades ── */
@@ -580,6 +670,22 @@ $("#sesFecha").onchange=$("#sesHora").onchange=()=>{
 
 $("#btnBackHistorial").onclick=()=>{ renderSelector(); mostrar("sel"); };
 $("#btnNuevaSesionHist").onclick=()=>abrirSesion(sesionEquipo);
+
+// Filtro de fechas en historial
+function aplicarFiltroFechas(){
+  const eq=cargar(), e=eq[sesionEquipo]; if(!e) return;
+  const desde=$("#filtroDesde").value, hasta=$("#filtroHasta").value;
+  let ses=e.sesiones;
+  if(desde) ses=ses.filter(s=>s.fecha>=desde);
+  if(hasta) ses=ses.filter(s=>s.fecha<=hasta);
+  renderSesionesHistorial(sesionEquipo, ses);
+}
+$("#filtroDesde").onchange=aplicarFiltroFechas;
+$("#filtroHasta").onchange=aplicarFiltroFechas;
+$("#btnLimpiarFiltro").onclick=()=>{ $("#filtroDesde").value=""; $("#filtroHasta").value=""; aplicarFiltroFechas(); };
+
+$("#btnEditarSesion").onclick=toggleEditarSesion;
+$("#btnGuardarEdicion").onclick=guardarEdicionSesion;
 $("#btnBackVerSesion").onclick=()=>abrirHistorial(sesionEquipo);
 
 /* ── Service Worker ── */
